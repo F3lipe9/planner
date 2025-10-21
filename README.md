@@ -1,171 +1,278 @@
-4 Year Planner 
-1. User Experience & Onboarding
-Progressive data collection: Instead of one long form, use a multi-step wizard:
+UMD 4-Year Planner - Updated Project Plan
+Project Overview
+A no-login-required web application that generates optimized 4-year plans for UMD students using official course data and historical grade information.
 
-Major & start year
+Core Technology Stack
+Frontend: React + TypeScript + Tailwind CSS + React DnD
 
-Completed courses (with smart suggestions as they type)
+Backend: Node.js + Express (minimal API layer)
 
-GENED completion (visual checklist with course recommendations)
+Database: PostgreSQL (caching merged course data)
 
-Plan generation with preview
+Deployment: Vercel (frontend) + Railway (backend/database)
 
-"Starter template" selection: Offer pre-built templates beyond just major:
+APIs: UMD.io (course data) + PlanetTerp (grade data)
 
-"Accelerated" (heavy course loads)
+Phase 1: Foundation & MVP (Weeks 1-3)
+Week 1: Core Infrastructure
+Set up development environment and project structure
 
-"Study abroad" (lighter semesters with flexibility)
+Create basic React app with TypeScript and Tailwind
 
-"Internship-focused" (summer terms free)
+Establish PostgreSQL database on Railway
 
-"Graduate school prep" (research opportunities built in)
+Build UMD.io API integration service
 
-Real-time validation: As users select completed courses, immediately show how it affects their remaining requirements
+Create basic course search component
 
-2. Smart Algorithm Enhancements
-"Difficulty balancing": Ensure each semester has a mix of easy and challenging courses based on historical GPA data
+Week 2: Data Layer & Planning Algorithm
+Build PlanetTerp API integration for grade data
 
-Prerequisite-aware scheduling: Auto-adjust plan if prerequisites aren't met in the right sequence
+Create course data merger (UMD.io + PlanetTerp)
 
-Course availability intelligence: Weight courses higher that are consistently offered each semester vs. rarely offered courses
+Implement caching system for course information
 
-Professor quality factor: Incorporate PlanetTerp professor ratings into course recommendations
+Develop core plan generation algorithm
 
-3. Plan Customization Features
-"What-if" scenarios: Allow users to easily duplicate their plan and try different majors/minors
+Build major requirement data structure
 
-Semester swapping: One-click to swap entire semesters (Fall/Spring) for study abroad planning
+Week 3: Basic Planner UI
+Create drag-and-drop semester grid component
 
-Course bundles: Pre-defined groups of courses that work well together (e.g., "Data Science track" for CS majors)
+Implement major selection and start year input
 
-Summer term integration: Smart suggestions for summer courses that accelerate progress
+Build completed courses input system
 
-4. Requirement Tracking System
-Visual progress bars for each requirement category:
+Add basic requirement validation
 
-Major core (75% complete)
+Create simple PDF export functionality
 
-Major electives (50% complete)
+Phase 2: Smart Features & Optimization (Weeks 4-6)
+Week 4: Enhanced Planning Logic
+Implement GPA-aware course placement
 
-GENED categories (individual progress per category)
+Add prerequisite validation and enforcement
 
-Total credits (90/120 complete)
+Build credit balancing (12-17 credits per semester)
 
-"Click to fulfill": Click on any unmet requirement to see course options that fulfill it
+Create GENED requirement tracking
 
-Alternative fulfillment: Show when courses can fulfill multiple requirements and let users choose how to apply them
+Develop transfer credit handling
 
-5. Export & Sharing Capabilities
-Advisor-ready formats: PDF export optimized for academic advisor meetings
+Week 5: User Experience & Customization
+Build course replacement interface with recommendations
 
-"Share for feedback": Generate a view-only link to share with advisors/family
+Add "what-if" scenario support
 
-Calendar integration: Export to Google Calendar with tentative course schedules
+Implement real-time requirement checking
 
-Degree audit simulation: Generate a report that mimics the official UMD degree audit
+Create visual progress indicators
 
-6. Data & Personalization
-Anonymous analytics: Track which majors are most planned for, common course combinations (with user permission)
+Add semester swapping functionality
 
-"Students like you": Show how similar students structured their plans (aggregated, anonymous data)
+Week 6: Polish & Export Features
+Enhance PDF export with professional formatting
 
-Save/restore via token: Generate a unique code to save plan and return later without login
+Add plan sharing via unique URLs
 
-Mobile-first design: Optimize for students planning on phones between classes
+Implement mobile-responsive design
 
-7. Integration Opportunities
-RateMyProfessors linkage: Show professor ratings directly in course selection
+Add error handling and user feedback
 
-Textbook cost estimates: Integrate with Amazon API to show estimated semester costs
+Performance optimization and caching
 
-Classroom location mapping: Show how far apart classes are for schedule planning
+Phase 3: Advanced Features (Weeks 7-8)
+Week 7: Intelligence Enhancements
+Add professor rating integration
 
-Peer planning: Optional collaboration features for student groups planning together
+Implement course difficulty balancing
 
-8. Error Prevention & Guidance
-"Are you sure?" warnings when making potentially problematic changes:
+Build "similar students" recommendations
 
-Dropping prerequisites needed for future courses
+Add summer term planning
 
-Creating impossible prerequisite chains
+Create advanced validation warnings
 
-Going significantly under/over credit limits
+Week 8: Testing & Launch
+Comprehensive testing across majors
 
-"Why this course?" explanations: Show the algorithm's reasoning for course placements
+User acceptance testing with real students
 
-Alternative pathways: When requirements conflict, show multiple valid sequencing options
+Performance and load testing
 
-9. Performance Considerations
-Client-side caching: Cache course data and requirements locally for fast interactions
+Documentation and deployment
 
-Progressive loading: Load major requirements first, then GENED, then elective options
+Launch and initial user feedback collection
 
-Search optimization: Implement debounced search with course code and title matching
+Data Architecture
+Core Data Sources:
+UMD.io API (Primary):
 
-Plan validation worker: Run requirement checking in a web worker to avoid UI blocking
+Courses, prerequisites, GENED attributes
 
-10. Future Expansion Possibilities
-Transfer student mode: Specialized workflow for students with significant transfer credits
+Departments, majors, course descriptions
 
-Graduate school planning: Extend to 5-year bachelor's/master's programs
+Official course requirements
 
-Scholarship tracking: Integrate scholarship requirements into planning
+PlanetTerp API (Enhancement):
 
-Career path mapping: Connect course choices to career outcomes and skill development
+Average GPAs and grade distributions
 
-Implementation Phasing Recommendation
-Phase 1 (MVP):
+Professor ratings and difficulty scores
 
-Basic major selection + completed courses
+Course popularity metrics
 
-Simple plan generation from base templates
+Database Schema:
+courses - Merged course data from both APIs
 
-Manual course dragging between semesters
+majors - Major requirements and templates
 
-Basic requirement checking
+gened_categories - GENED requirement mapping
+
+base_plans - UMD's template plans per major
+
+user_sessions - Anonymous user plans
+
+Key Features by Phase
+MVP Features (Phase 1):
+Major selection with start year
+
+Completed courses input
+
+Basic 4-year plan generation
+
+Drag-and-drop course moving
+
+Simple requirement checking
 
 PDF export
 
-Phase 2:
+Enhanced Features (Phase 2):
+GPA-optimized course placement
 
-Smart algorithm with GPA optimization
+Smart course recommendations
 
 GENED requirement tracking
 
-Course replacement with recommendations
-
-Enhanced export options
+Transfer credit handling
 
 Mobile responsiveness
 
-Phase 3:
+Plan sharing URLs
 
-"What-if" scenarios
+Advanced Features (Phase 3):
+Professor quality integration
 
-Professor ratings integration
+Difficulty-balanced semesters
+
+Summer term planning
+
+"What-if" major scenarios
 
 Advanced validation and warnings
 
-Social sharing features
+API Integration Strategy
+Course Data Flow:
+Fetch course basics from UMD.io
 
-Phase 4:
+Enhance with grade data from PlanetTerp
 
+Merge and cache in PostgreSQL
+
+Serve optimized data to frontend
+
+Caching Strategy:
+Course data: 24-hour cache
+
+Search results: 1-hour cache
+
+User sessions: 24-hour expiration
+
+Major requirements: Weekly updates
+
+Risk Mitigation
+Technical Risks:
+API Rate Limiting: Implement aggressive caching
+
+Data Inconsistencies: UMD.io as source of truth, PlanetTerp as enhancement
+
+Performance: Client-side caching + CDN distribution
+
+User Experience Risks:
+Complex Planning: Progressive disclosure and smart defaults
+
+Data Loss: Auto-save with session tokens
+
+Confusion: Clear requirement status and warnings
+
+Success Metrics
+Plan generation under 3 seconds
+
+90%+ requirement accuracy
+
+Mobile usability score > 80
+
+User return rate > 40%
+
+Future Expansion Possibilities
 Transfer student optimization
 
-Career pathway integration
+Graduate school pathway planning
 
-Advanced analytics and insights
+Scholarship requirement tracking
 
-Key Differentiators from Existing Solutions
-No login barrier - instant access for all students
+Course schedule conflict detection
 
-True personalization - accounts for completed courses and transfer credits
+Textbook cost estimates
 
-Data-driven recommendations - uses actual grade distributions and course availability
+Final Stack & Data Sources
+Primary APIs:
+UMD.io API - Official course data, prerequisites, GENED info
 
-Flexible customization - easy drag-and-drop with smart alternatives
+PlanetTerp API - Average grades, professor ratings, grade distributions
 
-Advisor-friendly outputs - professional exports that work with existing university processes
+Data Split:
+From UMD.io:
 
-This approach positions your tool as the most accessible, intelligent, and practical planning solution for UMD students across all situations - from incoming freshmen to transfer students to those changing majors mid-career.
+Course codes, titles, credits, descriptions
 
+Structured prerequisites
+
+GENED requirements
+
+Departments, majors
+
+Semester availability
+
+From PlanetTerp:
+
+Average GPA per course
+
+Grade distributions (A%, B%, C%, etc.)
+
+Professor ratings and difficulty
+
+Course reviews sentiment
+
+Minimal Stack:
+Frontend: React + TypeScript + Tailwind CSS + React DnD
+
+Backend: Node.js + Express (API proxy + data merging)
+
+Database: PostgreSQL (cache merged course data)
+
+Deployment: Vercel + Railway
+
+Data Merging Strategy:
+Fetch course basics from UMD.io
+
+Enhance with grade data from PlanetTerp
+
+Cache merged results in PostgreSQL
+
+Use for smart planning algorithm
+
+Why Both Are Essential:
+UMD.io: Reliable, official prerequisites and requirements
+
+PlanetTerp: Critical for GPA optimization algorithm
