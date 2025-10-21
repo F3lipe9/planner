@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { query, testConnection } from './db';
-import { umdioService } from './services/umdioService';
+import { courseService } from './services/umdioService';
 
 dotenv.config();
 
@@ -56,6 +56,12 @@ app.get('/api/courses/search', async (req, res) => {
   try {
     const courses = await umdioService.searchCourses(q);
     console.log(`📊 Returning ${courses.length} courses to frontend`);
+    
+    // Log first course if available for debugging
+    if (courses.length > 0) {
+      console.log(`📋 Sample course: ${courses[0].course_id} - ${courses[0].name}`);
+    }
+    
     res.json(courses);
   } catch (error) {
     console.error('❌ Error in course search:', error);
