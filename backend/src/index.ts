@@ -18,7 +18,8 @@ app.get('/api/health', async (req, res) => {
   res.json({ 
     status: 'OK', 
     message: 'UMD Planner API is running',
-    database: dbConnected ? 'Connected' : 'Disconnected'
+    database: dbConnected ? 'Connected' : 'Disconnected',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -33,6 +34,8 @@ app.get('/api/init-db', async (req, res) => {
         credits INTEGER NOT NULL,
         description TEXT,
         department VARCHAR(50),
+        prerequisites TEXT,
+        average_gpa DECIMAL(3,2),
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
@@ -54,7 +57,7 @@ app.get('/api/courses/search', async (req, res) => {
   }
 
   try {
-    const courses = await umdioService.searchCourses(q);
+    const courses = await courseService.searchCourses(q);
     console.log(`📊 Returning ${courses.length} courses to frontend`);
     
     // Log first course if available for debugging
@@ -76,7 +79,7 @@ app.get('/api/courses/:courseId', async (req, res) => {
   console.log(`📝 Fetching course: ${courseId}`);
   
   try {
-    const course = await umdioService.getCourse(courseId);
+    const course = await courseService.getCourse(courseId);
     if (course) {
       res.json(course);
     } else {
@@ -88,14 +91,91 @@ app.get('/api/courses/:courseId', async (req, res) => {
   }
 });
 
-// Test UMD.io connection directly
-app.get('/api/test-umdio', async (req, res) => {
+// Get courses by department
+app.get('/api/courses/department/:dept', async (req, res) => {
+  const { dept } = req.params;
+  
+  console.log(`📝 Fetching courses for department: ${dept}`);
+  
   try {
-    const response = await fetch('https://api.umd.io/v1/courses');
+    // For now, we'll search by department name
+    const courses = await courseService.searchCourses(dept);
+    const departmentCourses = courses.filter(course => 
+      course.department.toLowerCase().includes(dept.toLowerCase()) ||
+      course.dept_id?.toLowerCase().includes(dept.toLowerCase())
+    );
+    
+    res.json(departmentCourses);
+  } catch (error) {
+    console.error('❌ Error fetching department courses:', error);
+    res.status(500).json({ error: 'Failed to fetch department courses' });
+  }
+});
+
+// Debug endpoint to see what courses are available from PlanetTerp
+app.get('/api/debug/courses', async (req, res) => {
+  try {
+    const { limit = '50' } = req.query;
+    const response = await fetch('https://planetterp.com/api/v1/courses');
+    const allCourses = await response.json();
+    
+    // Get unique departments
+    const departments = [...new Set(allCourses
+      .filter((course: any) => course.department)
+      .map((course: any) => course.department)
+    )].sort();
+    
+    // Get sample of courses
+    const sampleCourses = allCourses
+      .slice(0, parseInt(limit as string))
+      .map((course: any) => ({
+        course_id: course.name,
+        name: course.title,
+        department: course.department,
+        credits: course.credits,
+        description: course.description ? course.description.substring(0, 100) + '...' : 'No description',
+        prerequisites: course.prerequisites,
+        average_gpa: course.average_gpa
+      }));
+    
+    res.json({
+      totalCourses: allCourses.length,
+      departments: departments.slice(0, 20), // First 20 departments
+      sampleCourses: sampleCourses,
+      planetTerpStatus: 'Connected'
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      error: error.message,
+      planetTerpStatus: 'Failed'
+    });
+  }
+});
+
+// Test PlanetTerp connection directly
+app.get('/api/test-planetterp', async (req, res) => {
+  try {
+    const response = await fetch('https://planetterp.com/api/v1/courses');
     const data = await response.json();
+    
+    // Count courses by popular departments
+    const deptCounts: { [key: string]: number } = {};
+    data.forEach((course: any) => {
+      if (course.department) {
+        deptCounts[course.department] = (deptCounts[course.department] || 0) + 1;
+      }
+    });
+    
+    // Get top departments
+    const topDepartments = Object.entries(deptCounts)
+      .sort((a: any, b: any) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([dept, count]) => ({ department: dept, courseCount: count }));
+    
     res.json({
       totalCourses: data.length,
-      sampleCourses: data.slice(0, 5),
+      topDepartments: topDepartments,
+      sampleCourse: data.find((course: any) => course.name === 'CMSC131') || 'CMSC131 not found',
       status: 'SUCCESS'
     });
   } catch (error: any) {
@@ -106,7 +186,58 @@ app.get('/api/test-umdio', async (req, res) => {
   }
 });
 
+// Majors endpoint (placeholder for future development)
+app.get('/api/majors', async (req, res) => {
+  const popularMajors = [
+    { code: 'COMPSCI', name: 'Computer Science', department: 'Computer Science' },
+    { code: 'ENGL', name: 'English', department: 'English' },
+    { code: 'BIO', name: 'Biological Sciences', department: 'Biology' },
+    { code: 'PSYC', name: 'Psychology', department: 'Psychology' },
+    { code: 'ECON', name: 'Economics', department: 'Economics' },
+    { code: 'MATH', name: 'Mathematics', department: 'Mathematics' },
+    { code: 'CHEM', name: 'Chemistry', department: 'Chemistry' },
+    { code: 'PHYS', name: 'Physics', department: 'Physics' },
+    { code: 'HIST', name: 'History', department: 'History' },
+    { code: 'BMGT', name: 'Business Management', department: 'Business' }
+  ];
+  
+  res.json(popularMajors);
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'UMD 4-Year Planner API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      courseSearch: '/api/courses/search?q=:query',
+      courseDetails: '/api/courses/:courseId',
+      departmentCourses: '/api/courses/department/:dept',
+      majors: '/api/majors',
+      planGeneration: '/api/plans/generate (POST)',
+      debug: '/api/debug/courses'
+    }
+  });
+});
+
+// 404 handler for undefined routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Endpoint not found',
+    availableEndpoints: [
+      'GET  /api/health',
+      'GET  /api/courses/search?q=:query',
+      'GET  /api/courses/:courseId',
+      'GET  /api/courses/department/:dept',
+      'GET  /api/majors',
+      'POST /api/plans/generate',
+      'GET  /api/debug/courses',
+      'GET  /api/test-planetterp'
+    ]
+  });
+});
+
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});// Deployment trigger
- 
+  console.log(`🚀 UMD Planner API server running on port ${PORT}`);
+});
