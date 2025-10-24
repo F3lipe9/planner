@@ -27,11 +27,21 @@ export class CourseService {
     try {
       console.log(`🔍 Searching PlanetTerp for: "${query}"`);
       
-      // Use PlanetTerp's search endpoint instead of fetching all courses
+      // Try department search first if query looks like a department code
+      if (/^[A-Za-z]{4}$/.test(query)) {
+        console.log('🏫 Query looks like a department code, trying department search first');
+        const deptCourses = await this.getCoursesByDepartment(query);
+        if (deptCourses.length > 0) {
+          console.log(`📚 Found ${deptCourses.length} courses in department ${query}`);
+          return deptCourses;
+        }
+      }
+
+      // Fall back to search API
       const searchResponse = await axios.get(`${PLANETTERP_BASE_URL}/search`, {
         params: {
           query: query,
-          limit: 50 // Maximum allowed by API
+          limit: 100 // Increased limit for more comprehensive results
         }
       });
       
@@ -43,29 +53,47 @@ export class CourseService {
       console.log(`📚 Found ${courseResults.length} courses in search results`);
       
       if (courseResults.length === 0) {
-        console.log('🔍 No courses found in search, trying broader approach...');
+        // Try department search as fallback
+        if (query.length >= 2) {
+          const deptCourses = await this.getCoursesByDepartment(query.slice(0, 4));
+          if (deptCourses.length > 0) {
+            return deptCourses;
+          }
+        }
+        console.log('🔍 No courses found in search or department, using demo data...');
         return this.getDemoCourses(query);
       }
       
-      // Get detailed information for each course
+      // Process course results in parallel batches
       const courses: Course[] = [];
+      const batchSize = 10;
       
-      for (const courseResult of courseResults.slice(0, 20)) { // Limit to 20 courses
+      for (let i = 0; i < courseResults.length; i += batchSize) {
+        const batch = courseResults.slice(i, i + batchSize);
+        const batchPromises = batch.map((course: SearchResult) => this.getCourse(course.name));
+        
         try {
-          const courseDetail = await this.getCourse(courseResult.name);
-          if (courseDetail) {
-            courses.push(courseDetail);
-          }
+          const batchResults = await Promise.all(batchPromises);
+          courses.push(...batchResults.filter((c): c is Course => c !== null));
         } catch (error) {
-          console.log(`⚠️ Could not fetch details for ${courseResult.name}`);
+          console.error('❌ Error processing batch:', error);
+          continue; // Continue with next batch even if one fails
         }
         
-        // Small delay to be respectful to the API
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Small delay between batches to be respectful to the API
+        if (i + batchSize < courseResults.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
       
-      console.log(`✅ Returning ${courses.length} detailed courses`);
+      if (courses.length === 0) {
+        console.log('⚠️ No courses found with detailed information');
+        return this.getDemoCourses(query);
+      }
+      
+      console.log(`✅ Successfully retrieved ${courses.length} courses`);
       return courses;
+      
     } catch (error) {
       console.error('❌ Error searching PlanetTerp:', error);
       return this.getDemoCourses(query);
@@ -90,7 +118,6 @@ export class CourseService {
         description: courseData.description || 'No description available',
         dept_id: courseData.department,
         average_gpa: courseData.average_gpa,
-        // Extract prerequisites from description if available
         prerequisites: this.extractPrerequisites(courseData.description)
       };
     } catch (error) {
@@ -99,7 +126,6 @@ export class CourseService {
     }
   }
 
-  // Helper to extract prerequisites from course description
   private extractPrerequisites(description: string): string {
     if (!description) return '';
     
@@ -111,17 +137,17 @@ export class CourseService {
     return '';
   }
 
-  // Alternative: Get courses by department
   async getCoursesByDepartment(department: string): Promise<Course[]> {
     try {
       const response = await axios.get(`${PLANETTERP_BASE_URL}/courses`, {
         params: {
           department: department.toUpperCase(),
-          limit: 50
+          limit: 100 // Increased from 50 to 100
         }
       });
       
       const coursesData = response.data;
+      console.log(`📚 Found ${coursesData.length} courses in department ${department}`);
       
       return coursesData.map((course: any) => ({
         course_id: `${course.department}${course.course_number}`,
@@ -139,7 +165,6 @@ export class CourseService {
     }
   }
 
-  // Enhanced demo data as fallback
   private getDemoCourses(query: string): Course[] {
     console.log(`🔍 Using demo data for query: "${query}"`);
     
