@@ -27,40 +27,40 @@ export class CourseService {
     try {
       console.log(`🔍 Searching PlanetTerp for: "${query}"`);
       
-      // Try department search first if query looks like a department code
-      if (/^[A-Za-z]{4}$/.test(query)) {
-        console.log('🏫 Query looks like a department code, trying department search first');
+      // Try exact department match first (e.g., "CMSC", "MATH")
+      if (/^[A-Za-z]{4}$/i.test(query)) {
+        console.log('🏫 Query matches department code format, using department search');
         const deptCourses = await this.getCoursesByDepartment(query);
         if (deptCourses.length > 0) {
-          console.log(`📚 Found ${deptCourses.length} courses in department ${query}`);
           return deptCourses;
         }
       }
 
-      // Fall back to search API
-      const searchResponse = await axios.get(`${PLANETTERP_BASE_URL}/search`, {
-        params: {
-          query: query,
-          limit: 100 // Increased limit for more comprehensive results
-        }
-      });
-      
-      const searchResults: SearchResult[] = searchResponse.data;
-      console.log(`📊 Search found ${searchResults.length} total results`);
-      
-      // Filter to only courses (not professors)
-      const courseResults = searchResults.filter(result => result.type === 'course');
-      console.log(`📚 Found ${courseResults.length} courses in search results`);
-      
-      if (courseResults.length === 0) {
-        // Try department search as fallback
-        if (query.length >= 2) {
-          const deptCourses = await this.getCoursesByDepartment(query.slice(0, 4));
+      // Try partial department match (e.g., "CMS" from "CMSC")
+      if (query.length >= 3) {
+        const deptMatches = await this.findMatchingDepartments(query);
+        if (deptMatches.length === 1) {
+          console.log(`🎯 Found exact department match: ${deptMatches[0]}`);
+          const deptCourses = await this.getCoursesByDepartment(deptMatches[0]);
           if (deptCourses.length > 0) {
             return deptCourses;
           }
         }
-        console.log('🔍 No courses found in search or department, using demo data...');
+      }
+
+      // Fall back to search API if not a department query
+      console.log('📚 Falling back to general course search');
+      const searchResponse = await axios.get(`${PLANETTERP_BASE_URL}/search`, {
+        params: {
+          query: query,
+          limit: 100
+        }
+      });
+      
+      const searchResults: SearchResult[] = searchResponse.data;
+      const courseResults = searchResults.filter(result => result.type === 'course');
+      
+      if (courseResults.length === 0) {
         return this.getDemoCourses(query);
       }
       
@@ -77,7 +77,7 @@ export class CourseService {
           courses.push(...batchResults.filter((c): c is Course => c !== null));
         } catch (error) {
           console.error('❌ Error processing batch:', error);
-          continue; // Continue with next batch even if one fails
+          continue;
         }
         
         // Small delay between batches to be respectful to the API
@@ -86,17 +86,33 @@ export class CourseService {
         }
       }
       
-      if (courses.length === 0) {
-        console.log('⚠️ No courses found with detailed information');
-        return this.getDemoCourses(query);
-      }
-      
-      console.log(`✅ Successfully retrieved ${courses.length} courses`);
       return courses;
       
     } catch (error) {
       console.error('❌ Error searching PlanetTerp:', error);
       return this.getDemoCourses(query);
+    }
+  }
+
+  // Helper method to find matching departments
+  private async findMatchingDepartments(partialDept: string): Promise<string[]> {
+    try {
+      const response = await axios.get(`${PLANETTERP_BASE_URL}/courses`, {
+        params: { limit: 1 }
+      });
+      
+      // Extract unique departments from the first page of results
+      const departments = [...new Set(response.data
+        .map((course: any) => course.department)
+        .filter((dept: string) => dept))];
+      
+      // Find departments that match the partial query
+      return departments.filter(dept => 
+        dept.toLowerCase().startsWith(partialDept.toLowerCase())
+      );
+    } catch (error) {
+      console.error('Error finding departments:', error);
+      return [];
     }
   }
 
@@ -142,23 +158,33 @@ export class CourseService {
       const response = await axios.get(`${PLANETTERP_BASE_URL}/courses`, {
         params: {
           department: department.toUpperCase(),
-          limit: 100 // Increased from 50 to 100
+          limit: 100
         }
       });
       
-      const coursesData = response.data;
+      const coursesData = response.data.filter((course: any) => 
+        course.department === department.toUpperCase()
+      );
+      
       console.log(`📚 Found ${coursesData.length} courses in department ${department}`);
       
-      return coursesData.map((course: any) => ({
-        course_id: `${course.department}${course.course_number}`,
-        name: course.title,
-        department: course.department,
-        credits: course.credits?.toString() || '3',
-        description: course.description || 'No description available',
-        dept_id: course.department,
-        average_gpa: course.average_gpa,
-        prerequisites: this.extractPrerequisites(course.description)
-      }));
+      return coursesData
+        .sort((a: any, b: any) => {
+          // Sort by course number
+          const aNum = parseInt(a.course_number);
+          const bNum = parseInt(b.course_number);
+          return aNum - bNum;
+        })
+        .map((course: any) => ({
+          course_id: `${course.department}${course.course_number}`,
+          name: course.title,
+          department: course.department,
+          credits: course.credits?.toString() || '3',
+          description: course.description || 'No description available',
+          dept_id: course.department,
+          average_gpa: course.average_gpa,
+          prerequisites: this.extractPrerequisites(course.description)
+        }));
     } catch (error) {
       console.error('Error fetching department courses:', error);
       return [];
@@ -188,25 +214,6 @@ export class CourseService {
         dept_id: 'CMSC',
         prerequisites: 'CMSC131 with C- or better',
         average_gpa: 3.1
-      },
-      {
-        course_id: 'MATH140',
-        name: 'Calculus I',
-        department: 'Mathematics',
-        credits: '4',
-        description: 'Differential calculus, including functions, limits, continuity, differentiation, and applications.',
-        dept_id: 'MATH',
-        prerequisites: 'MATH115 or placement',
-        average_gpa: 2.8
-      },
-      {
-        course_id: 'ENGL101',
-        name: 'Academic Writing',
-        department: 'English',
-        credits: '3',
-        description: 'Introduction to academic writing with emphasis on critical reading and writing processes.',
-        dept_id: 'ENGL',
-        average_gpa: 3.4
       }
     ];
 
@@ -219,7 +226,6 @@ export class CourseService {
       course.dept_id?.toLowerCase().includes(queryLower)
     );
 
-    console.log(`🔍 Demo data filtered to: ${filtered.length} courses`);
     return filtered.length > 0 ? filtered : allDemoCourses.slice(0, 2);
   }
 }
