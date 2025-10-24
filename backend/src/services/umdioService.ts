@@ -101,13 +101,15 @@ export class CourseService {
         params: { limit: 1 }
       });
       
-      // Extract unique departments from the first page of results
+      // Extract unique departments from the first page of results and ensure they're strings
       const departments = [...new Set(response.data
         .map((course: any) => course.department)
-        .filter((dept: string) => dept))];
+        .filter((dept: unknown): dept is string => 
+          typeof dept === 'string' && dept.length > 0
+        ))] as string[];
       
       // Find departments that match the partial query
-      return departments.filter(dept => 
+      return departments.filter((dept: string) => 
         dept.toLowerCase().startsWith(partialDept.toLowerCase())
       );
     } catch (error) {
