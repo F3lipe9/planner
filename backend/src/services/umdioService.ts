@@ -376,6 +376,12 @@ export class CourseService {
         genEds.push(marker);
       }
     }
+
+    // Check for Fundamental Studies Academic Writing requirement
+    if (description.toLowerCase().includes('fundamental studies academic writing') ||
+        description.toLowerCase().includes('general education fundamental studies academic writing')) {
+      genEds.push('FSAW');
+    }
     
     return [...new Set(genEds)]; // Remove duplicates
   }
