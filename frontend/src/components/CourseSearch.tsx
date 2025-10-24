@@ -8,7 +8,7 @@ interface Course {
   department: string;
   dept_id?: string;
   prerequisites?: string;
-  gen_ed?: string[][];
+  gen_ed?: string[];
   average_gpa?: number;
 }
 
@@ -142,21 +142,28 @@ const CourseSearch: React.FC = () => {
               >
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="font-bold text-umd-red text-lg">
-                        {course.course_id}
-                      </div>
-                      <div className="bg-green-100 text-green-800 text-sm px-2 py-1 rounded font-medium">
-                        {course.credits} cr
-                      </div>
-                      {course.average_gpa && (
-                        <div className={`text-sm px-2 py-1 rounded font-medium ${getGpaColor(course.average_gpa)}`}>
-                          GPA: {course.average_gpa.toFixed(2)}
+                    <div className="flex flex-col gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="font-bold text-umd-red text-lg">
+                          {course.course_id}
                         </div>
-                      )}
+                        <div className="bg-green-100 text-green-800 text-sm px-2 py-1 rounded font-medium">
+                          {course.credits} cr
+                        </div>
+                        {course.average_gpa && (
+                          <div className={`text-sm px-2 py-1 rounded font-medium ${getGpaColor(course.average_gpa)}`}>
+                            GPA: {course.average_gpa.toFixed(2)}
+                          </div>
+                        )}
+                      </div>
                       {course.gen_ed && course.gen_ed.length > 0 && (
-                        <div className="text-sm px-2 py-1 rounded font-medium bg-purple-100 text-purple-800">
-                          GenEd: {course.gen_ed.join(', ')}
+                        <div className="flex gap-1 flex-wrap items-center">
+                          <span className="text-xs font-medium text-gray-500">GenEd:</span>
+                          {course.gen_ed.map((genEd, i) => (
+                            <div key={i} className="text-xs px-2 py-1 rounded-full font-medium bg-purple-100 text-purple-800 hover:bg-purple-200 transition-colors">
+                              {genEd}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
