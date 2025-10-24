@@ -2,6 +2,207 @@ import axios from 'axios';
 
 const PLANETTERP_BASE_URL = 'https://planetterp.com/api/v1';
 
+// Complete list of UMD departments
+const UMD_DEPARTMENTS = new Map<string, string>([
+  ['AAAS', 'African American and Africana Studies'],
+  ['AAST', 'Asian American Studies'],
+  ['ABRM', 'Anti-Black Racism'],
+  ['AGNR', 'Agriculture and Natural Resources'],
+  ['AGST', 'Agricultural Science and Technology'],
+  ['AMSC', 'Applied Mathematics & Scientific Computation'],
+  ['AMST', 'American Studies'],
+  ['ANSC', 'Animal Science'],
+  ['ANTH', 'Anthropology'],
+  ['AOSC', 'Atmospheric and Oceanic Science'],
+  ['ARAB', 'Arabic'],
+  ['ARCH', 'Architecture'],
+  ['AREC', 'Agricultural and Resource Economics'],
+  ['ARHU', 'Arts and Humanities'],
+  ['ARMY', 'Army'],
+  ['ARSC', 'Air Science'],
+  ['ARTH', 'Art History & Archaeology'],
+  ['ARTT', 'Art Studio'],
+  ['ASTR', 'Astronomy'],
+  ['BCHM', 'Biochemistry'],
+  ['BDBA', 'Doctor of Business Administration'],
+  ['BIOE', 'Bioengineering'],
+  ['BIOI', 'Bioinformatics and Computational Biology'],
+  ['BIOL', 'Biology'],
+  ['BIOM', 'Biometrics'],
+  ['BIPH', 'Biophysics'],
+  ['BISI', 'Biological Sciences'],
+  ['BMGT', 'Business and Management'],
+  ['BMIN', 'General Business Minor'],
+  ['BMSO', 'Online Business MS Programs'],
+  ['BSCI', 'Biological Sciences Program'],
+  ['BSOS', 'Behavioral and Social Sciences'],
+  ['BSST', 'Terrorism Studies'],
+  ['BUAC', 'Accounting and Information Assurance'],
+  ['BUDT', 'Decision and Information Technologies'],
+  ['BUFN', 'Finance'],
+  ['BULM', 'Logistics, Business, and Public Policy'],
+  ['BUMK', 'Marketing'],
+  ['BUSI', 'Part-Time MBA Program'],
+  ['BUSM', 'Full-Time MBA Program'],
+  ['BUSO', 'Online MBA Program'],
+  ['CBMG', 'Cell Biology & Molecular Genetics'],
+  ['CCJS', 'Criminology and Criminal Justice'],
+  ['CHBE', 'Chemical and Biomolecular Engineering'],
+  ['CHEM', 'Chemistry'],
+  ['CHIN', 'Chinese'],
+  ['CHPH', 'Chemical Physics'],
+  ['CHSE', 'Counseling, Higher Education, and Special Education'],
+  ['CINE', 'Cinema and Media Studies'],
+  ['CLAS', 'Classics'],
+  ['CLFS', 'Chemical and Life Sciences'],
+  ['CMLT', 'Comparative Literature'],
+  ['CMSC', 'Computer Science'],
+  ['COMM', 'Communication'],
+  ['CPBE', 'College Park Scholars-Business, Society, Entreprenrshp'],
+  ['CPCV', 'College Park Scholars-Civic Engagement for Social Good'],
+  ['CPDJ', 'College Park Scholars-Data Justice'],
+  ['CPET', 'College Park Scholars-Environment, Technology & Economy'],
+  ['CPGH', 'College Park Scholars-Global Public Health'],
+  ['CPJT', 'College Park Scholars-Justice and Legal Thought'],
+  ['CPMS', 'College Park Scholars-Media, Self and Society'],
+  ['CPPL', 'College Park Scholars-Public Leadership'],
+  ['CPSA', 'College Park Scholars-Arts'],
+  ['CPSF', 'College Park Scholars-Life Sciences'],
+  ['CPSG', 'College Park Scholars-Science and Global Change'],
+  ['CPSN', 'College Park Scholars-International Studies'],
+  ['CPSP', 'College Park Scholars Program'],
+  ['CPSS', 'College Park Scholars-Science, Technology and Society'],
+  ['DANC', 'Dance'],
+  ['DATA', 'Data Science and Analytics'],
+  ['ECON', 'Economics'],
+  ['EDCP', 'Education Counseling and Personnel Services'],
+  ['EDDI', 'Education Dialogues'],
+  ['EDHD', 'Education, Human Development'],
+  ['EDHI', 'Education Leadership, Higher Ed and International Ed'],
+  ['EDSP', 'Education, Special'],
+  ['EDUC', 'Education'],
+  ['EMBA', 'Executive MBA Program'],
+  ['ENAE', 'Engineering, Aerospace'],
+  ['ENAI', 'Engineering Artificial Intelligence,Professional Masters'],
+  ['ENBC', 'Biocomputational Engineering'],
+  ['ENCE', 'Engineering, Civil'],
+  ['ENCO', 'Engineering, Cooperative Education'],
+  ['ENEB', 'Cyber-Physical Systems Engineering'],
+  ['ENED', 'Engineering Education'],
+  ['ENEE', 'Electrical & Computer Engineering'],
+  ['ENES', 'Engineering Science'],
+  ['ENFP', 'Engineering, Fire Protection'],
+  ['ENGL', 'English'],
+  ['ENMA', 'Engineering, Materials'],
+  ['ENME', 'Engineering, Mechanical'],
+  ['ENPM', 'Engineering, Professional Masters'],
+  ['ENRE', 'Reliability Engineering'],
+  ['ENSE', 'Systems Engineering'],
+  ['ENSP', 'Environmental Science and Policy'],
+  ['ENST', 'Environmental Science and Technology'],
+  ['ENTM', 'Entomology'],
+  ['ENTS', 'Telecommunications'],
+  ['ENVH', 'Environmental and Occupational Health'],
+  ['EPIB', 'Epidemiology and Biostatistics'],
+  ['FGSM', 'Federal and Global Fellows'],
+  ['FIRE', 'First-Year Innovation & Research Experience'],
+  ['FMSC', 'Family Science'],
+  ['FREN', 'French'],
+  ['GBHL', 'Global Health'],
+  ['GEMS', 'Gemstone'],
+  ['GEOG', 'Geographical Sciences'],
+  ['GEOL', 'Geology'],
+  ['GERS', 'German Studies'],
+  ['GFPL', 'Global and Foreign Policy'],
+  ['GREK', 'Greek'],
+  ['GVPT', 'Government and Politics'],
+  ['HACS', 'ACES-Cybersecurity'],
+  ['HBUS', 'Interdisciplinary Business Honors'],
+  ['HDCC', 'Design Cultures and Creativity'],
+  ['HEBR', 'Hebrew'],
+  ['HESI', 'Higher Ed, Student Affairs, and International Ed Policy'],
+  ['HESP', 'Hearing and Speech Sciences'],
+  ['HHUM', 'Honors Humanities'],
+  ['HISP', 'Historic Preservation'],
+  ['HIST', 'History'],
+  ['HLSA', 'Health Services Administration'],
+  ['HLSC', 'Integrated Life Sciences'],
+  ['HLTH', 'Health'],
+  ['HONR', 'Honors'],
+  ['IDEA', 'Academy for Innovation & Entrepreneurship'],
+  ['IMDM', 'Immersive Media Design'],
+  ['IMMR', 'Immigration Studies'],
+  ['INAG', 'Institute of Applied Agriculture'],
+  ['INFM', 'Information Management'],
+  ['INST', 'Information Studies'],
+  ['ISRL', 'Israel Studies'],
+  ['ITAL', 'Italian'],
+  ['JAPN', 'Japanese'],
+  ['JOUR', 'Journalism'],
+  ['JWST', 'Jewish Studies'],
+  ['KNES', 'Kinesiology'],
+  ['KORA', 'Korean'],
+  ['LACS', 'Latin American and Caribbean Studies'],
+  ['LARC', 'Landscape Architecture'],
+  ['LATN', 'Latin'],
+  ['LBSC', 'Library Science'],
+  ['LEAD', 'Leadership Education and Development'],
+  ['LGBT', 'Lesbian Gay Bisexual Transgender Studies'],
+  ['LING', 'Linguistics'],
+  ['MAIT', 'Masters in the Mathematics of Advanced Industrial Tech'],
+  ['MATH', 'Mathematics'],
+  ['MEES', 'Marine-Estuarine-Environmental Sciences'],
+  ['MIEH', 'Maryland Institute for Applied Environmental Health'],
+  ['MITH', 'Maryland Institute for Technology in the Humanities'],
+  ['MLAW', 'MPower Undergraduate Law Programs'],
+  ['MSAI', 'Master of Science in Artificial Intelligence'],
+  ['MSML', 'Machine Learning'],
+  ['MSQC', 'Quantum Computing'],
+  ['MUED', 'Music Education'],
+  ['MUSC', 'School of Music'],
+  ['NACS', 'Neuroscience & Cognitive Science'],
+  ['NAVY', 'Navy'],
+  ['NEUR', 'Neuroscience'],
+  ['NFSC', 'Nutrition and Food Science'],
+  ['NIAP', 'National Institute of Aeronautics - Va Tech'],
+  ['NIAV', 'National Institute of Aeronautics - Univ of VA'],
+  ['PEER', 'Health Center'],
+  ['PERS', 'Persian'],
+  ['PHIL', 'Philosophy'],
+  ['PHPE', 'Philosophy, Politics, and Economics'],
+  ['PHSC', 'Public Health Science'],
+  ['PHYS', 'Physics'],
+  ['PLCY', 'Public Policy'],
+  ['PLSC', 'Plant Sciences'],
+  ['PORT', 'Portuguese'],
+  ['PSYC', 'Psychology'],
+  ['QMMS', 'Quantitative Methodology: Measurement and Statistics'],
+  ['RDEV', 'Real Estate Development'],
+  ['RELS', 'Religious Studies'],
+  ['RUSS', 'Russian'],
+  ['SDSB', 'Social Data Science, BSOS'],
+  ['SLAA', 'Second Language Acquisition and Application'],
+  ['SLLC', 'School of Languages, Literatures and Cultures'],
+  ['SMLP', 'Southern Management Leadership Program'],
+  ['SOCY', 'Sociology'],
+  ['SPAN', 'Spanish'],
+  ['SPHL', 'Public Health'],
+  ['STAT', 'Statistics and Probability'],
+  ['SURV', 'Survey and Data Science'],
+  ['TDPS', 'Theatre, Dance and Performance Studies'],
+  ['THET', 'Theatre'],
+  ['TLPL', 'Teaching and Learning, Policy and Leadership'],
+  ['TLTC', 'Teaching and Learning Transformation Center'],
+  ['UMEI', 'Maryland English Institute'],
+  ['UNIV', 'University Courses'],
+  ['URSP', 'Urban Studies and Planning'],
+  ['USLT', 'Latina/o Studies'],
+  ['VIPS', 'Vertically Integrated Projects'],
+  ['VMSC', 'Veterinary Medical Sciences'],
+  ['WEID', 'Words of Engagement Intergroup Dialogue Program'],
+  ['WGSS', 'Women, Gender, and Sexuality Studies']
+]);
+
 export interface Course {
   course_id: string;
   name: string;
@@ -27,23 +228,33 @@ export class CourseService {
     try {
       console.log(`🔍 Searching PlanetTerp for: "${query}"`);
       
-      // Try exact department match first (e.g., "CMSC", "MATH")
-      if (/^[A-Za-z]{4}$/i.test(query)) {
-        console.log('🏫 Query matches department code format, using department search');
-        const deptCourses = await this.getCoursesByDepartment(query);
-        if (deptCourses.length > 0) {
-          return deptCourses;
-        }
-      }
-
-      // Try partial department match (e.g., "CMS" from "CMSC")
-      if (query.length >= 3) {
-        const deptMatches = await this.findMatchingDepartments(query);
-        if (deptMatches.length === 1) {
-          console.log(`🎯 Found exact department match: ${deptMatches[0]}`);
-          const deptCourses = await this.getCoursesByDepartment(deptMatches[0]);
+      // Check if the query matches a department code or name
+      const deptMatches = this.findMatchingDepartments(query);
+      console.log(`🏫 Found ${deptMatches.length} matching departments for "${query}"`);
+      
+      if (deptMatches.length > 0) {
+        // Exact match - search immediately
+        if (deptMatches.length === 1 || deptMatches.includes(query.toUpperCase())) {
+          const deptCode = deptMatches[0];
+          console.log(`� Using exact department match: ${deptCode} (${UMD_DEPARTMENTS.get(deptCode)})`);
+          const deptCourses = await this.getCoursesByDepartment(deptCode);
           if (deptCourses.length > 0) {
             return deptCourses;
+          }
+        }
+        
+        // Multiple matches - if query is long enough, try all of them
+        if (query.length >= 3) {
+          console.log(`📚 Searching multiple matching departments: ${deptMatches.join(', ')}`);
+          const allCourses: Course[] = [];
+          
+          for (const deptCode of deptMatches) {
+            const courses = await this.getCoursesByDepartment(deptCode);
+            allCourses.push(...courses);
+          }
+          
+          if (allCourses.length > 0) {
+            return allCourses;
           }
         }
       }
@@ -94,28 +305,19 @@ export class CourseService {
     }
   }
 
-  // Helper method to find matching departments
-  private async findMatchingDepartments(partialDept: string): Promise<string[]> {
-    try {
-      const response = await axios.get(`${PLANETTERP_BASE_URL}/courses`, {
-        params: { limit: 1 }
-      });
-      
-      // Extract unique departments from the first page of results and ensure they're strings
-      const departments = [...new Set(response.data
-        .map((course: any) => course.department)
-        .filter((dept: unknown): dept is string => 
-          typeof dept === 'string' && dept.length > 0
-        ))] as string[];
-      
-      // Find departments that match the partial query
-      return departments.filter((dept: string) => 
-        dept.toLowerCase().startsWith(partialDept.toLowerCase())
-      );
-    } catch (error) {
-      console.error('Error finding departments:', error);
-      return [];
+  // Helper method to find matching departments using the comprehensive UMD list
+  private findMatchingDepartments(partialDept: string): string[] {
+    const normalizedQuery = partialDept.toUpperCase();
+    const matches: string[] = [];
+    
+    for (const [code, name] of UMD_DEPARTMENTS.entries()) {
+      if (code.startsWith(normalizedQuery) || 
+          name.toUpperCase().includes(normalizedQuery)) {
+        matches.push(code);
+      }
     }
+    
+    return matches;
   }
 
   async getCourse(courseId: string): Promise<Course | null> {
