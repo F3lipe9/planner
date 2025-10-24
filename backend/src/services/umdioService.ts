@@ -13,6 +13,13 @@ export interface Course {
   gen_ed?: string[][];
   grading_method?: string[];
   average_gpa?: number;
+  type?: string;
+}
+
+export interface SearchResult {
+  name: string;
+  slug: string;
+  type: string; // 'course' or 'professor'
 }
 
 export class CourseService {
@@ -20,70 +27,116 @@ export class CourseService {
     try {
       console.log(`🔍 Searching PlanetTerp for: "${query}"`);
       
-      // Get all courses from PlanetTerp
-      const response = await axios.get(`${PLANETTERP_BASE_URL}/courses`);
-      console.log(`📊 Total courses from PlanetTerp: ${response.data.length}`);
+      // Use PlanetTerp's search endpoint instead of fetching all courses
+      const searchResponse = await axios.get(`${PLANETTERP_BASE_URL}/search`, {
+        params: {
+          query: query,
+          limit: 50 // Maximum allowed by API
+        }
+      });
       
-      const allCourses: any[] = response.data;
+      const searchResults: SearchResult[] = searchResponse.data;
+      console.log(`📊 Search found ${searchResults.length} total results`);
       
-      // Filter courses by query (case insensitive)
-      const filteredCourses = allCourses.filter(course => {
-        const searchText = query.toLowerCase();
-        return (
-          course.name?.toLowerCase().includes(searchText) ||
-          course.title?.toLowerCase().includes(searchText) ||
-          (course.department && course.department.toLowerCase().includes(searchText))
-        );
-      }).slice(0, 20); // Limit results
+      // Filter to only courses (not professors)
+      const courseResults = searchResults.filter(result => result.type === 'course');
+      console.log(`📚 Found ${courseResults.length} courses in search results`);
       
-      console.log(`✅ Found ${filteredCourses.length} courses for "${query}"`);
+      if (courseResults.length === 0) {
+        console.log('🔍 No courses found in search, trying broader approach...');
+        return this.getDemoCourses(query);
+      }
       
-      // Convert PlanetTerp format to our format
-      const formattedCourses: Course[] = filteredCourses.map(course => ({
-        course_id: course.name,
-        name: course.title,
-        department: course.department || 'Unknown Department',
-        credits: course.credits?.toString() || '3',
-        description: course.description || 'No description available',
-        dept_id: this.getDeptId(course.department),
-        prerequisites: course.prerequisites,
-        average_gpa: course.average_gpa
-      }));
+      // Get detailed information for each course
+      const courses: Course[] = [];
       
-      return formattedCourses;
+      for (const courseResult of courseResults.slice(0, 20)) { // Limit to 20 courses
+        try {
+          const courseDetail = await this.getCourse(courseResult.name);
+          if (courseDetail) {
+            courses.push(courseDetail);
+          }
+        } catch (error) {
+          console.log(`⚠️ Could not fetch details for ${courseResult.name}`);
+        }
+        
+        // Small delay to be respectful to the API
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      console.log(`✅ Returning ${courses.length} detailed courses`);
+      return courses;
     } catch (error) {
       console.error('❌ Error searching PlanetTerp:', error);
       return this.getDemoCourses(query);
     }
   }
 
-  // Extract department code from department name
-  private getDeptId(department: string): string {
-    if (!department) return 'UNKN';
+  async getCourse(courseId: string): Promise<Course | null> {
+    try {
+      const response = await axios.get(`${PLANETTERP_BASE_URL}/course`, {
+        params: { name: courseId }
+      });
+      
+      const courseData = response.data;
+      
+      return {
+        course_id: courseData.course_number ? 
+          `${courseData.department}${courseData.course_number}` : 
+          courseId,
+        name: courseData.title,
+        department: courseData.department || 'Unknown Department',
+        credits: courseData.credits?.toString() || '3',
+        description: courseData.description || 'No description available',
+        dept_id: courseData.department,
+        average_gpa: courseData.average_gpa,
+        // Extract prerequisites from description if available
+        prerequisites: this.extractPrerequisites(courseData.description)
+      };
+    } catch (error) {
+      console.error(`Error fetching course ${courseId}:`, error);
+      return null;
+    }
+  }
+
+  // Helper to extract prerequisites from course description
+  private extractPrerequisites(description: string): string {
+    if (!description) return '';
     
-    // Common department mappings
-    const deptMap: { [key: string]: string } = {
-      'computer science': 'CMSC',
-      'mathematics': 'MATH', 
-      'english': 'ENGL',
-      'chemistry': 'CHEM',
-      'physics': 'PHYS',
-      'biology': 'BIO',
-      'history': 'HIST',
-      'psychology': 'PSYC',
-      'economics': 'ECON',
-      'business': 'BMGT'
-    };
-    
-    const deptLower = department.toLowerCase();
-    for (const [key, code] of Object.entries(deptMap)) {
-      if (deptLower.includes(key)) {
-        return code;
-      }
+    const prereqMatch = description.match(/[Pp]rerequisite[^.]*\./);
+    if (prereqMatch) {
+      return prereqMatch[0];
     }
     
-    // Fallback: take first 4 letters of department
-    return department.substring(0, 4).toUpperCase();
+    return '';
+  }
+
+  // Alternative: Get courses by department
+  async getCoursesByDepartment(department: string): Promise<Course[]> {
+    try {
+      const response = await axios.get(`${PLANETTERP_BASE_URL}/courses`, {
+        params: {
+          department: department.toUpperCase(),
+          limit: 50
+        }
+      });
+      
+      const coursesData = response.data;
+      
+      return coursesData.map((course: any) => ({
+        course_id: `${course.department}${course.course_number}`,
+        name: course.title,
+        department: course.department,
+        credits: course.credits?.toString() || '3',
+        description: course.description || 'No description available',
+        dept_id: course.department,
+        average_gpa: course.average_gpa,
+        prerequisites: this.extractPrerequisites(course.description)
+      }));
+    } catch (error) {
+      console.error('Error fetching department courses:', error);
+      return [];
+    }
   }
 
   // Enhanced demo data as fallback
@@ -99,7 +152,6 @@ export class CourseService {
         description: 'Introduction to programming and computer science. Emphasizes understanding and implementation of applications using object-oriented techniques.',
         dept_id: 'CMSC',
         prerequisites: 'MATH140',
-        grading_method: ['Regular'],
         average_gpa: 3.2
       },
       {
@@ -110,7 +162,6 @@ export class CourseService {
         description: 'Continuation of CMSC131. Further development of programming and software development skills.',
         dept_id: 'CMSC',
         prerequisites: 'CMSC131 with C- or better',
-        grading_method: ['Regular'],
         average_gpa: 3.1
       },
       {
@@ -121,7 +172,6 @@ export class CourseService {
         description: 'Differential calculus, including functions, limits, continuity, differentiation, and applications.',
         dept_id: 'MATH',
         prerequisites: 'MATH115 or placement',
-        grading_method: ['Regular'],
         average_gpa: 2.8
       },
       {
@@ -131,8 +181,6 @@ export class CourseService {
         credits: '3',
         description: 'Introduction to academic writing with emphasis on critical reading and writing processes.',
         dept_id: 'ENGL',
-        gen_ed: [['FSAW']],
-        grading_method: ['Regular'],
         average_gpa: 3.4
       }
     ];
@@ -149,28 +197,6 @@ export class CourseService {
     console.log(`🔍 Demo data filtered to: ${filtered.length} courses`);
     return filtered.length > 0 ? filtered : allDemoCourses.slice(0, 2);
   }
-
-  async getCourse(courseId: string): Promise<Course | null> {
-    try {
-      const response = await axios.get(`${PLANETTERP_BASE_URL}/course?name=${courseId}`);
-      const course = response.data;
-      
-      return {
-        course_id: course.name,
-        name: course.title,
-        department: course.department || 'Unknown Department',
-        credits: course.credits?.toString() || '3',
-        description: course.description || 'No description available',
-        dept_id: this.getDeptId(course.department),
-        prerequisites: course.prerequisites,
-        average_gpa: course.average_gpa
-      };
-    } catch (error) {
-      console.error('Error fetching course from PlanetTerp:', error);
-      return null;
-    }
-  }
 }
 
-// ✅ THIS IS THE CRITICAL LINE - Make sure this export exists
 export const courseService = new CourseService();

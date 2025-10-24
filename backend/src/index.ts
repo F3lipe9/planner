@@ -46,7 +46,7 @@ app.get('/api/init-db', async (req, res) => {
   }
 });
 
-// Course search endpoint
+// Course search endpoint - uses PlanetTerp search API
 app.get('/api/courses/search', async (req, res) => {
   const { q } = req.query;
   
@@ -60,9 +60,14 @@ app.get('/api/courses/search', async (req, res) => {
     const courses = await courseService.searchCourses(q);
     console.log(`📊 Returning ${courses.length} courses to frontend`);
     
-    // Log first course if available for debugging
+    // Log search statistics
     if (courses.length > 0) {
-      console.log(`📋 Sample course: ${courses[0].course_id} - ${courses[0].name}`);
+      console.log(`📋 Sample courses found:`);
+      courses.slice(0, 3).forEach((course, index) => {
+        console.log(`   ${index + 1}. ${course.course_id} - ${course.name}`);
+      });
+    } else {
+      console.log('🔍 No courses found for search query');
     }
     
     res.json(courses);
@@ -98,25 +103,76 @@ app.get('/api/courses/department/:dept', async (req, res) => {
   console.log(`📝 Fetching courses for department: ${dept}`);
   
   try {
-    // For now, we'll search by department name
-    const courses = await courseService.searchCourses(dept);
-    const departmentCourses = courses.filter(course => 
-      course.department.toLowerCase().includes(dept.toLowerCase()) ||
-      course.dept_id?.toLowerCase().includes(dept.toLowerCase())
-    );
-    
-    res.json(departmentCourses);
+    const courses = await courseService.getCoursesByDepartment(dept);
+    console.log(`📊 Found ${courses.length} courses in department ${dept}`);
+    res.json(courses);
   } catch (error) {
     console.error('❌ Error fetching department courses:', error);
     res.status(500).json({ error: 'Failed to fetch department courses' });
   }
 });
 
+// Debug endpoint to test PlanetTerp search directly
+app.get('/api/debug/search', async (req, res) => {
+  const { q } = req.query;
+  
+  if (!q || typeof q !== 'string') {
+    return res.status(400).json({ error: 'Query parameter required' });
+  }
+
+  try {
+    console.log(`🔍 Debug: Testing PlanetTerp search for: "${q}"`);
+    
+    // Test the search endpoint directly
+    const searchResponse = await fetch(`https://planetterp.com/api/v1/search?query=${q}&limit=50`);
+    const searchResults = await searchResponse.json();
+    
+    // Test the courses endpoint for comparison
+    const coursesResponse = await fetch('https://planetterp.com/api/v1/courses?limit=50');
+    const allCourses = await coursesResponse.json();
+    
+    // Filter courses that match the query from all courses
+    const filteredFromAll = allCourses.filter((course: any) => 
+      course.name?.toLowerCase().includes(q.toLowerCase()) ||
+      course.title?.toLowerCase().includes(q.toLowerCase()) ||
+      course.department?.toLowerCase().includes(q.toLowerCase())
+    );
+    
+    res.json({
+      searchQuery: q,
+      searchEndpointResults: {
+        total: searchResults.length,
+        courses: searchResults.filter((r: any) => r.type === 'course').length,
+        professors: searchResults.filter((r: any) => r.type === 'professor').length,
+        results: searchResults.slice(0, 10)
+      },
+      allCoursesEndpointResults: {
+        total: allCourses.length,
+        matching: filteredFromAll.length,
+        results: filteredFromAll.slice(0, 10)
+      },
+      recommendation: filteredFromAll.length > searchResults.filter((r: any) => r.type === 'course').length ? 
+        'Use /courses endpoint with filtering' : 'Use /search endpoint'
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      error: error.message,
+      searchQuery: q
+    });
+  }
+});
+
 // Debug endpoint to see what courses are available from PlanetTerp
 app.get('/api/debug/courses', async (req, res) => {
   try {
-    const { limit = '50' } = req.query;
-    const response = await fetch('https://planetterp.com/api/v1/courses');
+    const { limit = '50', department } = req.query;
+    
+    let url = `https://planetterp.com/api/v1/courses?limit=${limit}`;
+    if (department && typeof department === 'string') {
+      url += `&department=${department}`;
+    }
+    
+    const response = await fetch(url);
     const allCourses = await response.json();
     
     // Get unique departments
@@ -140,9 +196,10 @@ app.get('/api/debug/courses', async (req, res) => {
     
     res.json({
       totalCourses: allCourses.length,
-      departments: departments.slice(0, 20), // First 20 departments
+      departments: departments.slice(0, 20),
       sampleCourses: sampleCourses,
-      planetTerpStatus: 'Connected'
+      planetTerpStatus: 'Connected',
+      endpointUsed: url
     });
   } catch (error: any) {
     res.status(500).json({ 
@@ -155,12 +212,18 @@ app.get('/api/debug/courses', async (req, res) => {
 // Test PlanetTerp connection directly
 app.get('/api/test-planetterp', async (req, res) => {
   try {
-    const response = await fetch('https://planetterp.com/api/v1/courses');
-    const data = await response.json();
+    // Test multiple endpoints
+    const [coursesResponse, searchResponse] = await Promise.all([
+      fetch('https://planetterp.com/api/v1/courses?limit=10'),
+      fetch('https://planetterp.com/api/v1/search?query=CMSC&limit=10')
+    ]);
+    
+    const coursesData = await coursesResponse.json();
+    const searchData = await searchResponse.json();
     
     // Count courses by popular departments
     const deptCounts: { [key: string]: number } = {};
-    data.forEach((course: any) => {
+    coursesData.forEach((course: any) => {
       if (course.department) {
         deptCounts[course.department] = (deptCounts[course.department] || 0) + 1;
       }
@@ -173,9 +236,15 @@ app.get('/api/test-planetterp', async (req, res) => {
       .map(([dept, count]) => ({ department: dept, courseCount: count }));
     
     res.json({
-      totalCourses: data.length,
+      endpointsTested: {
+        courses: coursesResponse.status,
+        search: searchResponse.status
+      },
+      totalCoursesInSample: coursesData.length,
+      searchResults: searchData.length,
       topDepartments: topDepartments,
-      sampleCourse: data.find((course: any) => course.name === 'CMSC131') || 'CMSC131 not found',
+      sampleCourse: coursesData.find((course: any) => course.name === 'CMSC131') || 'CMSC131 not found',
+      searchSample: searchData.filter((item: any) => item.type === 'course').slice(0, 3),
       status: 'SUCCESS'
     });
   } catch (error: any) {
@@ -186,7 +255,7 @@ app.get('/api/test-planetterp', async (req, res) => {
   }
 });
 
-// Majors endpoint (placeholder for future development)
+// Majors endpoint
 app.get('/api/majors', async (req, res) => {
   const popularMajors = [
     { code: 'COMPSCI', name: 'Computer Science', department: 'Computer Science' },
@@ -204,6 +273,55 @@ app.get('/api/majors', async (req, res) => {
   res.json(popularMajors);
 });
 
+// Plan generation endpoint (placeholder for future development)
+app.post('/api/plans/generate', async (req, res) => {
+  const { major, completedCourses, startYear, preferences } = req.body;
+  
+  console.log(`📝 Generating plan for: ${major}, start year: ${startYear}`);
+  
+  // Placeholder response - will implement actual planning logic later
+  res.json({
+    plan: {
+      major: major,
+      startYear: startYear,
+      semesters: [],
+      generatedAt: new Date().toISOString(),
+      status: 'placeholder'
+    },
+    message: 'Plan generation endpoint - to be implemented'
+  });
+});
+
+// Course statistics endpoint
+app.get('/api/stats/courses', async (req, res) => {
+  try {
+    const response = await fetch('https://planetterp.com/api/v1/courses?limit=100');
+    const courses = await response.json();
+    
+    const stats = {
+      totalCourses: courses.length,
+      departments: [...new Set(courses.map((c: any) => c.department))].length,
+      coursesWithGPA: courses.filter((c: any) => c.average_gpa).length,
+      averageCredits: (courses.reduce((sum: number, c: any) => sum + (c.credits || 0), 0) / courses.length).toFixed(1),
+      topDepartments: Object.entries(
+        courses.reduce((acc: any, course: any) => {
+          if (course.department) {
+            acc[course.department] = (acc[course.department] || 0) + 1;
+          }
+          return acc;
+        }, {})
+      )
+      .sort((a: any, b: any) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([dept, count]) => ({ department: dept, courseCount: count }))
+    };
+    
+    res.json(stats);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
@@ -216,8 +334,14 @@ app.get('/', (req, res) => {
       departmentCourses: '/api/courses/department/:dept',
       majors: '/api/majors',
       planGeneration: '/api/plans/generate (POST)',
-      debug: '/api/debug/courses'
-    }
+      debug: {
+        courses: '/api/debug/courses',
+        search: '/api/debug/search?q=:query',
+        planetTerp: '/api/test-planetterp'
+      },
+      stats: '/api/stats/courses'
+    },
+    description: 'API for UMD 4-Year Planner - Course data powered by PlanetTerp'
   });
 });
 
@@ -233,11 +357,27 @@ app.use('*', (req, res) => {
       'GET  /api/majors',
       'POST /api/plans/generate',
       'GET  /api/debug/courses',
-      'GET  /api/test-planetterp'
+      'GET  /api/debug/search?q=:query',
+      'GET  /api/test-planetterp',
+      'GET  /api/stats/courses'
     ]
+  });
+});
+
+// Error handling middleware
+app.use((error: any, req: any, res: any, next: any) => {
+  console.error('🚨 Unhandled error:', error);
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : error.message
   });
 });
 
 app.listen(PORT, () => {
   console.log(`🚀 UMD Planner API server running on port ${PORT}`);
+  console.log(`📚 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔍 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🎯 Course search: http://localhost:${PORT}/api/courses/search?q=CMSC`);
+  console.log(`🔧 Debug endpoints available`);
+  console.log(`📊 Powered by PlanetTerp API`);
 });
