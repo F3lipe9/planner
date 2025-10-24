@@ -10,7 +10,7 @@ export interface Course {
   description: string;
   dept_id?: string;
   prerequisites?: string;
-  gen_ed?: string[][];
+  gen_ed?: string[];
   grading_method?: string[];
   average_gpa?: number;
   type?: string;
@@ -136,7 +136,8 @@ export class CourseService {
         description: courseData.description || 'No description available',
         dept_id: courseData.department,
         average_gpa: courseData.average_gpa,
-        prerequisites: this.extractPrerequisites(courseData.description)
+        prerequisites: this.extractPrerequisites(courseData.description),
+        gen_ed: this.extractGenEds(courseData.description)
       };
     } catch (error) {
       console.error(`Error fetching course ${courseId}:`, error);
@@ -153,6 +154,28 @@ export class CourseService {
     }
     
     return '';
+  }
+
+  private extractGenEds(description: string): string[] {
+    if (!description) return [];
+    
+    const genEds: string[] = [];
+    
+    // Check for GenEd markers in the description
+    const genEdMatch = description.match(/[Gg]en[Ee]d:?\s*([A-Z,\s]+)/);
+    if (genEdMatch?.[1]) {
+      genEds.push(...genEdMatch[1].split(/[,\s]+/).filter(g => g));
+    }
+
+    // Check for DSSP, DVUP, SCIS, etc. markers
+    const markers = ['DSSP', 'DVUP', 'SCIS', 'FSOC', 'FSAR', 'FSMA', 'FSPW', 'DSHS', 'DSHU', 'DSNS', 'DSNL', 'DSSP'];
+    for (const marker of markers) {
+      if (description.includes(marker)) {
+        genEds.push(marker);
+      }
+    }
+    
+    return [...new Set(genEds)]; // Remove duplicates
   }
 
   async getCoursesByDepartment(department: string): Promise<Course[]> {
@@ -185,7 +208,8 @@ export class CourseService {
           description: course.description || 'No description available',
           dept_id: course.department,
           average_gpa: course.average_gpa,
-          prerequisites: this.extractPrerequisites(course.description)
+          prerequisites: this.extractPrerequisites(course.description),
+          gen_ed: this.extractGenEds(course.description)
         }));
     } catch (error) {
       console.error('Error fetching department courses:', error);
