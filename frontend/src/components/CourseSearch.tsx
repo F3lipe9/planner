@@ -154,6 +154,11 @@ const CourseSearch: React.FC = () => {
                           GPA: {course.average_gpa.toFixed(2)}
                         </div>
                       )}
+                      {course.gen_ed && course.gen_ed.length > 0 && (
+                        <div className="text-sm px-2 py-1 rounded font-medium bg-purple-100 text-purple-800">
+                          GenEd: {course.gen_ed.join(', ')}
+                        </div>
+                      )}
                     </div>
                     
                     <div className="text-md font-semibold text-gray-800 mb-1">
